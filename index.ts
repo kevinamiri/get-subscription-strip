@@ -10,10 +10,10 @@ export const handler: Handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResultV2> => {
   const { authorizer } = event.requestContext;
-  const { sub, email: claimEmail } = authorizer.claims;
+  const requestBody = JSON.parse(event.body);
 
-  const requestBody = JSON.parse(event.body || '{}');
-  const userEmail = requestBody.email || claimEmail;
+
+  const userEmail = requestBody.email || authorizer.claims.email;
 
   if (!userEmail) {
     return {
