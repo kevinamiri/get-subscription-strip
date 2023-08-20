@@ -9,20 +9,31 @@ import { getTotalCharsForActiveSubscriptions } from "./stripe";
 export const handler: Handler = async (
   event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResultV2> => {
-  let requestContexts = event.requestContext.authorizer;
-  const user = requestContexts.claims.sub;
-  const bodyEvent = JSON.parse(event.body);
-  // user email
-  const email = bodyEvent?.email as string
-  const useremail = requestContexts.claims.email || email
-  const userActiveSubscriptions = await getTotalCharsForActiveSubscriptions(useremail);
+  const { authorizer } = event.requestContext;
+  const { sub, email: claimEmail } = authorizer.claims;
 
-  let res = {};
-  res["statusCode"] = 200;
-  res["headers"] = {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
+  const requestBody = JSON.parse(event.body || '{}');
+  const userEmail = requestBody.email || claimEmail;
+
+  if (!userEmail) {
+    return {
+      statusCode: 400,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      },
+      body: JSON.stringify({ error: "Email not provided" }),
+    };
+  }
+
+  const userActiveSubscriptions = await getTotalCharsForActiveSubscriptions(userEmail);
+
+  return {
+    statusCode: 200,
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+    },
+    body: JSON.stringify(userActiveSubscriptions),
   };
-  res["body"] = JSON.stringify(userActiveSubscriptions);
-  return res;
 };
