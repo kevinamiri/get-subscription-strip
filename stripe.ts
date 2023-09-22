@@ -162,9 +162,22 @@ export const subscriptionData = async (email: string) => {
     return false;
 };
 
+async function getAllSubscriptions(): Promise<Array<{ id: string, plan: string }>> {
+    const subscriptions = await stripe.subscriptions.list();
+    return subscriptions.data.map(sub => ({
+        id: sub.id,
+        plan: sub.items.data[0]?.plan.id || 'N/A',
+    }));
+}
 
 
-
+async function getAllProducts(): Promise<Array<{ id: string, name: string }>> {
+    const products = await stripe.products.list();
+    return products.data.map(product => ({
+        id: product.id,
+        name: product.name,
+    }));
+}
 
 
 interface SubscriptionDetails {
@@ -174,6 +187,7 @@ interface SubscriptionDetails {
     currentPeriodEnd: Date;
     amount: number;
     currency: string;
+    n_characters: number;
 }
 
 /**
@@ -183,13 +197,6 @@ interface SubscriptionDetails {
  * @returns Promise<SubscriptionDetails[]> Returns an array of details about the customer's active subscriptions.
  */
 
-const subscriptions = [
-    { id: 'prod_ORVVQvf4NNIrHM', name: 'TTS-500k', chars: 500000 },
-    { id: 'prod_ORVTaqllmu66Sh', name: 'TTS-250k', chars: 250000 },
-    { id: 'prod_ORVRHvcGGnacnS', name: 'TTS-100k', chars: 100000 },
-    { id: 'prod_ORHkZD7RnyjpJt', name: 'TTS-50k', chars: 50000 },
-    { id: 'prod_L5FdspKcIm93KY', name: 'Premium Subscription', chars: 50000 },
-    { id: 'prod_MSKBmbdLqGnUgQ', name: 'Premium Plan - Autumn 2022', chars: 50000 }]
 
 async function getActiveSubscriptionDetails(email: string): Promise<SubscriptionDetails[]> {
     try {
@@ -218,6 +225,7 @@ async function getActiveSubscriptionDetails(email: string): Promise<Subscription
                         currentPeriodEnd: new Date(subscription.current_period_end * 1000),
                         amount: subscription.items.data[0].price.unit_amount || 0,
                         currency: subscription.items.data[0].price.currency,
+                        n_characters: Number(product.metadata.n_characters), // number of the allowed characters to use
                     });
                 }
             }
@@ -230,40 +238,24 @@ async function getActiveSubscriptionDetails(email: string): Promise<Subscription
     }
 }
 
-
-async function getAllSubscriptions(): Promise<Array<{ id: string, plan: string }>> {
-    const subscriptions = await stripe.subscriptions.list();
-    return subscriptions.data.map(sub => ({
-        id: sub.id,
-        plan: sub.items.data[0]?.plan.id || 'N/A',
-    }));
-}
-
-
-async function getAllProducts(): Promise<Array<{ id: string, name: string }>> {
-    const products = await stripe.products.list();
-    return products.data.map(product => ({
-        id: product.id,
-        name: product.name,
-    }));
-}
-
-
-
-
 export async function getTotalCharsForActiveSubscriptions(email: string): Promise<number> {
     try {
+        // Get all active subscriptions for an account.
         const activeSubscriptions = await getActiveSubscriptionDetails(email);
+
+        // Initialize totalChars to 0.
         let totalChars = 0;
 
+        // Loop through each active subscription and sum up the n_characters.
         for (const subscription of activeSubscriptions) {
-            const productChars = subscriptions.find(sub => sub.id === subscription.productId)?.chars || 0;
-            totalChars += productChars;
+            totalChars += subscription.n_characters;
         }
 
+        // Return the total number of characters.
         return totalChars;
     } catch (error) {
-        console.error('Error fetching total chars for active subscriptions:', error);
+        console.error('Error in getTotalCharsForActiveSubscriptions:', error);
         throw error;
     }
 }
+
